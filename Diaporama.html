@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diaporama - CTA Services aux personnes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body, html {
+      width: 100%;
+      height: 100%;
+      background-color: #000;
+      overflow: hidden;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Conteneur principal */
+    #slideshow {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Diapositive d'introduction (Logo 01) */
+    #intro-slide {
+      position: absolute;
+      inset: 0;
+      background-color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      opacity: 1;
+      transition: opacity 0.8s ease-in-out;
+    }
+    #intro-slide.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #intro-slide img {
+      max-width: 80%;
+      max-height: 80%;
+      object-fit: contain;
+    }
+
+    /* Images du diaporama */
+    #photo-display {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 0.6s ease-in-out;
+    }
+    #photo-display.visible {
+      opacity: 1;
+    }
+
+    /* Logo 02 fixe en haut à droite (sans scintillement) */
+    #corner-logo {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      width: 105px;
+      height: auto;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 8px 12px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+      z-index: 15;
+      display: none;
+    }
+    #corner-logo.visible {
+      display: block;
+    }
+
+    /* Barre de contrôle au survol */
+    #controls {
+      position: fixed;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 20, 20, 0.75);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 20px;
+      font-size: 14px;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 30;
+    }
+    body:hover #controls { opacity: 1; }
+    button {
+      background: none;
+      border: 1px solid #fff;
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body>
+
+  <div id="slideshow">
+    <!-- Écran d'accueil avec Logo 01 (complet) -->
+    <div id="intro-slide">
+      <img src="https://lh3.googleusercontent.com/d/1QY4ikb3n49U-2QjGLwT0uLRjI798qCS4=w1920" alt="Logo CTA Collège La Fraternité">
+    </div>
+
+    <!-- Photo courante -->
+    <img id="photo-display" src="" alt="Diapositive">
+
+    <!-- Logo 02 permanent en haut à droite (sigle A) -->
+    <img id="corner-logo" src="https://lh3.googleusercontent.com/d/14cLVJ7Kd1_yiFSuj1U20Eqg4ckjlR_6L=w500" alt="Logo CTA">
+  </div>
+
+  <div id="controls">
+    <button id="prev-btn">◀ Précédent</button>
+    <span id="counter">Accueil</span>
+    <button id="pause-btn">Pause</button>
+    <button id="next-btn">Suivant ▶</button>
+    <button id="fs-btn">Plein écran</button>
+  </div>
+
+  <script>
+    const DUREE_INTRO = 6000; // 6 secondes pour l'accueil
+    const DUREE_PHOTO = 5000; // 5 secondes par photo
+
+    // Liste exacte des 72 photos sur Google Drive (01 à 72)
+    const driveIds = [
+      "1bAGXp2X7AHIf4dLepcZRrouYs4scb1qc", "1Hl-E5pc1YUK5KhrvLnww5MDSud2gmdiL",
+      "16B9XMlWRTyYOHbLUyMgrC_omlZUUITW3", "1dA-k5ZUFxkgwTIKLyKsAwyUb5iWoSm96",
+      "1GAYMu6eVGjKNHkqDDEgngAEABxmcA7yV", "1tuxictYCi0rgZzNV-rj56bBjEGs_7V8v",
+      "1P4r9PRiI3LQtqKwS4WHySaozMfYYzuul", "1ks63YmvrNs8k6M-eovslT6ZxHpnGWnvH",
+      "1_kMxiyCAQUOW-w7a37L3eZ9caHh6cqnM", "1VD3ZVolXA0wRsV7L96JLIskLt4-KXru0",
+      "1BsexkouaxZ5ShVPG2bW-LVwuFHALxHs5", "1rnXHKWH5MY7EN1CxCVfUl0-BRJA3JtiF",
+      "1YGMXBGSvN5mVGONQPHi7VcZ3pW3WXSVb", "1FNzxh6lP4byk0LkyxE_U9Rd2RptCdy5z",
+      "1I1uDQ-1zlTTrMSRAXFvsQhFo7Q6VG86D", "1Eatu-nltxQgGd3oMp2NSnozVPMCjDbZ_",
+      "1ZDqteWH0h4CTGq-LSiq0TxoEW11pCc7J", "1vadOS-MLD-Jz3-LhbM-nFThIRorZjDUn",
+      "1DagqxxO551ALEf82tY-V6HliM1Ix2rRh", "1sb1nfzwEyJf3RylTJBnX8knpYGjML4u0",
+      "1VuiYAloXW-LdAPjli9MYf7YfNN0n6mXQ", "1wUNwNZMhSbI_spZTytpTxlNIHKWRFij7",
+      "15WJO6whC68prqp4hxXP0ie51aljZXQu-", "1hsCg0Y8WSJ8Mk4PnYW1l-At3HAYAZPx5",
+      "1FkQIo0zv0dzMARCa7NN_wBHNRI4PpXLM", "10peQM6E6JNdAl06BtqtrlD_CNgIREdGO",
+      "12OkwvTwaIrSFGSSgNWew2PhFklADcMix", "1hjg0jnY3FYhMuh1R2Zuqm6pKfzONlYRK",
+      "1kyj_LsAds_Wusr4epD95R8qI-mkvDx-X", "1YWpv9GYzhqlXpiaY1cfbMsu6M6I6q2qX",
+      "1Hfw6aHWhfNHnOv-51OOSAGGimVxxTfcP", "1gGIo0uCMQq9vywU954JmJqK7wxNR-rc9",
+      "10s-oV1_W2EEU-Ope29DIBpsDGY8rGnLx", "1XWXK5ce2txEJgRJXHGWTvpgQ-CoRodpd",
+      "16X_r9nC_uAEbqN0VQ1stG_dihj1ZugSg", "1BkSML8eQeax-ZbMue0BEsoMIncQgxECu",
+      "1R-YVKC172ZCb_p4TAnrgMUJfqeEua38z", "1Y6yr5L_Asd8lZwzlAM51QqVNb8gevtIn",
+      "1ep0OOn0g3UqXJwVDn4OMtYLYpCyCqHEE", "1kL_y4ed0Dh_0WORX9gqgn-o147Ca8INz",
+      "1xZScMi2jiie01vBpB8fk2oss4TB5tRoR", "15Z3JANNF7RsSFtLG0o4vucFpaaf7elT3",
+      "1f3avBilGZ98EjX8VZqrmSB9dZH3lTZO_", "1PCYJWuQxDH4WtNLdqguaJWTRsikknCZk",
+      "1oZyAmJeuQYYDLpjF00dAYfIwswCmUqnT", "1JPZcVT7ufVG9iThw7emQWpd61c2Z3wcO",
+      "18K2DHQ3wM5pgJePKjXfWxluR186A1Ow-", "1WQ8YYZaNhk2WFDX31TGBWYIwjQ0FEIrw",
+      "1wnfDvm5I8MJfLYJrCh6iBmnIFphgbU-N", "1AmrzpZzd7GKVexPZRnK-etR46JMdeqYk",
+      "1KZygWCFIpmmMCTKUOFWD0BA5gmQST8xz", "1q3oE07JW6X2PjBbQvZcg3fBQ_4isoH0g",
+      "1SrKm-pBMsSERJ6v7BLu78LXaiFHLTHZW", "12RB3cr_TupPBNQvGgoUEF9R3Zj-92yHa",
+      "19rREcn0ldJGSbUMDUGFtLiBfhwShXMu-", "1FTzWN0ebDmNskF6TlbEMgAoNFS8NN8av",
+      "1zBoKY5-k-JUJyqQ4inoKLSXFXKx3gm9y", "1Y9NM2_6qQlPDmaLKQ48S20tAdsy7e6J5",
+      "1n_f97Z49BPdIJNiRFlrzQm5MH0DbS_X6", "1nGtIl686zrxG_LbvlguK0oCOha2jMTx5",
+      "1v4QfwwSX-CRT7lmRg9Vr2K-nahvhf5EU", "1DOLmZZIFG747bgrjhvveBmgABBJTUSjH",
+      "1OCchel7rOaPlNzFU4EBhC3iUN11CBam8", "1yooAxV-EjFdliXYl2K9NqiMK6F6GRU6s",
+      "1yg-KhbqeVyy8Xxn7Fk_JZbOfyRKztD2q", "1Ss3Mj2ySLJXq1rgws7kP28mnrE5DBReM",
+      "1oXOg3HnmKlJYRNFxgaEdWn6nYlGd0qrh", "1U9nBQtqR849mOdXysWNXJ8BXh2u5NiUR",
+      "1T8K_tJXxkRS5OeUic6f_i5ppSGXZsfl9", "11dMWxplwPL80gSIecDtvV6MNBPgis2Ks",
+      "18y1uShgJuFAVPLC-lF-bKrZOm5MZlpKr", "1_42XjQnH-If1nNgxBmpW4ujL7tKbEgaP"
+    ];
+
+    const getUrl = (id) => `https://lh3.googleusercontent.com/d/${id}=w1920`;
+
+    let currentIndex = -1;
+    let timer = null;
+    let isPaused = false;
+
+    const introSlide = document.getElementById("intro-slide");
+    const photoDisplay = document.getElementById("photo-display");
+    const cornerLogo = document.getElementById("corner-logo");
+    const counter = document.getElementById("counter");
+
+    function showSlide(index) {
+      clearTimeout(timer);
+      currentIndex = index;
+
+      if (currentIndex === -1) {
+        introSlide.classList.remove("hidden");
+        cornerLogo.classList.remove("visible");
+        photoDisplay.classList.remove("visible");
+        counter.textContent = "Accueil (Logo 01)";
+        if (!isPaused) timer = setTimeout(() => showSlide(0), DUREE_INTRO);
+      } else {
+        introSlide.classList.add("hidden");
+        cornerLogo.classList.add("visible");
+
+        const nextIdx = (currentIndex + 1 >= driveIds.length) ? -1 : currentIndex + 1;
+
+        const imgPreload = new Image();
+        imgPreload.src = getUrl(driveIds[currentIndex]);
+        imgPreload.onload = () => {
+          photoDisplay.style.opacity = 0;
+          setTimeout(() => {
+            photoDisplay.src = imgPreload.src;
+            photoDisplay.style.opacity = 1;
+            counter.textContent = `Photo ${currentIndex + 1} / ${driveIds.length}`;
+          }, 150);
+        };
+
+        if (!isPaused) timer = setTimeout(() => showSlide(nextIdx), DUREE_PHOTO);
+      }
+    }
+
+    document.getElementById("next-btn").onclick = () => {
+      showSlide((currentIndex + 1 >= driveIds.length) ? -1 : currentIndex + 1);
+    };
+    document.getElementById("prev-btn").onclick = () => {
+      showSlide((currentIndex - 1 < -1) ? driveIds.length - 1 : currentIndex - 1);
+    };
+    document.getElementById("pause-btn").onclick = (e) => {
+      isPaused = !isPaused;
+      e.target.textContent = isPaused ? "Reprendre" : "Pause";
+      if (!isPaused) showSlide(currentIndex);
+      else clearTimeout(timer);
+    };
+    document.getElementById("fs-btn").onclick = () => {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    };
+
+    showSlide(-1);
+  </script>
+</body>
+</html>
